@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import httpx
 import os
+import asyncio
 
 app = FastAPI(title="Funny Affirmations (Reddit-powered)")
 
@@ -98,21 +99,16 @@ async def refresh_cache():
     global _cache
     now = time.time()
     if now - _cache["ts"] < CACHE_TTL and _cache["items"]:
-        return  # still fresh
-
-    # Rebuild cache
+        return  
+    tasks = [fetch_subreddit_top(sub) for sub in SUBREDDITS]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
     all_items: List[Dict[str, Any]] = []
-
-    # Fetch a bit from each subreddit; errors per-sub don’t kill the whole refresh
-    for sub in SUBREDDITS:
-        try:
-            items = await fetch_subreddit_top(sub)
-            all_items.extend(items)
-        except Exception:
-            # Soft-fail this subreddit
-            continue
-
-    # Deduplicate by text
+    for res in results:
+        # Check if a task failed and, if so, skip it
+        if isinstance(res, Exception):
+            continue  
+        all_items.extend(res)
     dedup: Dict[str, Dict[str, Any]] = {}
     for it in all_items:
         key = it["line"].lower()
@@ -120,7 +116,6 @@ async def refresh_cache():
             dedup[key] = it
 
     _cache = {"items": list(dedup.values()), "ts": now}
-
 
 @app.get("/")
 async def root():

@@ -19,18 +19,11 @@ app.add_middleware(
 # Subreddits that often have one-liner “affirmations” / pickup-ish humor
 SUBREDDITS = [
     "UnusualAffirmations",    # absurd positive statements
-    "Affirmations",           # mix of serious and joke affirmations
     "PickupLines",            # cheesy or witty
-    "clevercomebacks",        # quick witty replies
     "Showerthoughts",         # weird or deep short thoughts
     "Oneliners",              # pure short jokes
-    "dadjokes",               # safe pun-heavy humor
     "punny",                  # puns and wordplay
     "contagiouslaughter",     # silly lines and fun moments
-    "me_irl",                 # random self-deprecating jokes
-    "rareinsults",            # creatively funny roasts
-    "2meirl4meirl",           # surreal and absurd humor
-    "firstworldanarchists",   # small harmless rebellion humor
     "funny",                  # general humor, needs filtering
 ]
 
@@ -147,9 +140,10 @@ async def refresh_cache():
     
     all_items: List[Dict[str, Any]] = []
     for res in results:
-        # Check if a task failed and, if so, skip it
+        # Check if a task failed and, if so, print the error and skip it
         if isinstance(res, Exception):
-            continue  
+            print(f"--> Reddit fetch failed: {res}", file=sys.stderr) # 💡 ADD THIS LINE
+            continue
         all_items.extend(res)
     dedup: Dict[str, Dict[str, Any]] = {}
     for it in all_items:

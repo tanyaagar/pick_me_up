@@ -10,7 +10,6 @@ import asyncio
 
 app = FastAPI(title="Funny Affirmations (Reddit-powered)")
 
-# Allow local dev + static file fetches
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_credentials=True,
@@ -36,10 +35,53 @@ SUBREDDITS = [
 ]
 
 # Cache (in-memory)
-CACHE_TTL = 60 * 60  # 1 hour
-_cache: Dict[str, Any] = {"items": [], "ts": 0}
+FALLBACK_AFFIRMATIONS = [
+    {
+        "line": "You are as brilliant as a firefly in a jar, which is to say, you are a source of light in a confined space.",
+        "permalink": "https://www.reddit.com/r/UnusualAffirmations/", "subreddit": "UnusualAffirmations", "ups": 1337,
+    },
+    {
+        "line": "If you were a vegetable, you’d be a cute-cumber.",
+        "permalink": "https://www.reddit.com/r/PickupLines/", "subreddit": "PickupLines", "ups": 9001,
+    },
+    {
+        "line": "Your socks probably match right now. And if they don't, you're a rebel who can't be contained.",
+        "permalink": "https://www.reddit.com/r/funny/", "subreddit": "funny", "ups": 5000,
+    },
+    # --- New affirmations added below ---
+    {
+        "line": "This is the equation of you: U = QT",
+        "permalink": "https://www.reddit.com/r/PickupLines/", "subreddit": "PickupLines", "ups": 1500,
+    },
+    {
+        "line": "If every time I thought of you a snowflake fell from the sky, we'd be in the middle of a blizzard.",
+        "permalink": "https://www.reddit.com/r/PickupLines/", "subreddit": "PickupLines", "ups": 2500,
+    },
+    {
+        "line": "I used to play piano by ear, but now I use my hands.",
+        "permalink": "https://www.reddit.com/r/dadjokes/", "subreddit": "dadjokes", "ups": 1800,
+    },
+    {
+        "line": "Why don’t skeletons fight each other? They don’t have the guts.",
+        "permalink": "https://www.reddit.com/r/dadjokes/", "subreddit": "dadjokes", "ups": 2200,
+    },
+    {
+        "line": "What did the janitor say when he jumped out of the closet? “Supplies!”",
+        "permalink": "https://www.reddit.com/r/punny/", "subreddit": "punny", "ups": 1950,
+    },
+    {
+        "line": "I’m reading a book on the history of glue. I just can’t seem to put it down.",
+        "permalink": "https://www.reddit.com/r/dadjokes/", "subreddit": "dadjokes", "ups": 3100,
+    },
+]
 
-USER_AGENT = "FunnyAffirmationsBot/0.1 (by u/your_username)"
+# Cache (in-memory) - pre-populated with the expanded fallback list
+CACHE_TTL = 60 * 60  # 1 hour
+_cache: Dict[str, Any] = {"items": FALLBACK_AFFIRMATIONS, "ts": 0}
+
+
+
+USER_AGENT = "F/0.1 (by u/my-cool-app)"
 
 
 def _looks_funny(text: str) -> bool:
@@ -115,7 +157,15 @@ async def refresh_cache():
         if key not in dedup or it.get("ups", 0) > dedup[key].get("ups", 0):
             dedup[key] = it
 
-    _cache = {"items": list(dedup.values()), "ts": now}
+    # 💡 FIX: Only update the cache if new items were actually fetched.
+    new_items = list(dedup.values())
+    if new_items:
+        _cache = {"items": new_items, "ts": now}
+    else:
+        # If the fetch failed, keep the old data but update the timestamp
+        # to prevent trying again on every single request.
+        _cache["ts"] = now
+    
 
 @app.get("/")
 async def root():

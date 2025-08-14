@@ -125,7 +125,7 @@ async def refresh_cache():
 @app.get("/")
 async def root():
     # Serve the tiny frontend
-    return FileResponse("static/index.html")
+    return FileResponse("index.html")
 
 
 @app.get("/random")
